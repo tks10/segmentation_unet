@@ -8,6 +8,9 @@ class Loader(object):
     def __init__(self, dir_original, dir_segmented, init_size=(256, 256), one_hot=True):
         self._data = Loader.import_images(dir_original, dir_segmented, init_size, one_hot)
 
+    def get_all_dataset(self):
+        return self._data
+
     @staticmethod
     def import_images(dir_original, dir_segmented, init_size=None, one_hot=True):
         paths_original = glob.glob(dir_original + "/*")
@@ -33,14 +36,22 @@ class Loader(object):
         print("Completed.")
         assert len(images_original) == len(images_segmented)
 
-        if one_hot:
-            _labels = np.zeros((len(_images), label_count))
-            for i in range(_labels.shape[0]):
-                _labels[i][label] = 1
-        else:
-            _labels = np.full(len(_images), label)
+        images_original = np.asarray(images_original, dtype=np.float32)
+        images_segmented = np.asarray(images_segmented, dtype=np.uint8)
+        images_segmented = np.where(images_segmented == 255, len(DataSet.CATEGORY)-1, images_segmented)
 
-        return DataSet(_images, _labels)
+        if one_hot:
+            # One hot encoding using identity matrix.
+            identity = np.identity(len(DataSet.CATEGORY), dtype=np.uint8)
+            images_segmented = identity[images_segmented]
+        else:
+            pass
+
+        # Get a palette
+        image_sample_palette = Image.open(paths_segmented[0])
+        palette = image_sample_palette.getpalette()
+
+        return DataSet(images_original, images_segmented, palette)
 
     @staticmethod
     def image_generator(file_paths, init_size=None, normalization=True):
@@ -81,15 +92,36 @@ class Loader(object):
 
 
 class DataSet(object):
-    BACKGROUND = (0, 0, 0)
-    VOID = (255, 255, 255)
+    CATEGORY = (
+        "ground",
+        "aeroplane",
+        "bicycle",
+        "bird",
+        "boat",
+        "bottle",
+        "bus",
+        "car",
+        "cat",
+        "chair",
+        "cow",
+        "dining table",
+        "dog",
+        "horse",
+        "motorbike",
+        "person",
+        "potted plant",
+        "sheep",
+        "sofa",
+        "train",
+        "tv/monitor",
+        "void"
+    )
 
-    def __init__(self, images_original, images_segmented, labels):
-        assert len(images_original) == len(images_segmented) and len(images_original) == len(labels),\
-            "images and labels must have same length."
+    def __init__(self, images_original, images_segmented, image_palette):
+        assert len(images_original) == len(images_segmented), "images and labels must have same length."
         self._images_original = np.asarray(images_original, dtype=np.float32)
         self._images_segmented = np.asarray(images_segmented, dtype=np.float32)
-        self._labels = np.asarray(labels, dtype=np.int32)
+        self._image_palette = image_palette
 
     @property
     def images_original(self):
@@ -98,10 +130,6 @@ class DataSet(object):
     @property
     def images_segmented(self):
         return self._images_segmented
-
-    @property
-    def labels(self):
-        return self._labels
 
     @property
     def length(self):
@@ -114,23 +142,22 @@ class DataSet(object):
     def __add__(self, other):
         images_original = np.concatenate([self.images_original, other.images_original])
         images_segmented = np.concatenate([self.images_segmented, other.images_segmented])
-        labels = np.concatenate([self.labels, other.labels])
-        return DataSet(images_original, images_segmented, labels)
+        return DataSet(images_original, images_segmented)
 
     def shuffle(self):
-        list_packed = list(zip(self._images_original, self._images_segmented, self._labels))
+        list_packed = list(zip(self._images_original, self._images_segmented))
         np.random.shuffle(list_packed)
         images_original, images_segmented, labels = zip(*list_packed)
-        return DataSet(images_original, images_segmented, labels)
+        return DataSet(images_original, images_segmented)
 
     def transpose_by_color(self):
         image_original = self._images_original.transpose(0, 3, 1, 2)
         image_segmented = self._images_segmented.transpose(0, 3, 1, 2)
-        return DataSet(image_original, image_segmented, self._labels)
+        return DataSet(image_original, image_segmented)
 
     def perm(self, start, end):
         end = min(end, len(self._images_original))
-        return DataSet(self._images_original[start:end], self._images_segmented[start:end], self._labels[start:end])
+        return DataSet(self._images_original[start:end], self._images_segmented[start:end])
 
     def __call__(self, batch_size=20, shuffle=True):
         """
@@ -155,6 +182,5 @@ class DataSet(object):
 if __name__ == "__main__":
     dataset_loader = Loader(dir_original="../data_set/VOCdevkit/VOC2012/JPEGImages",
                             dir_segmented="../data_set/VOCdevkit/VOC2012/SegmentationClass")
-    train, test = dataset_loader.load_train_test()
-    train.print_information()
-    test.print_information()
+    data = dataset_loader.get_all_dataset()
+    data.print_information()
