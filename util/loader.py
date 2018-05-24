@@ -6,13 +6,24 @@ import os
 
 class Loader(object):
     def __init__(self, dir_original, dir_segmented, init_size=(256, 256), one_hot=True):
-        self._data = Loader.import_images(dir_original, dir_segmented, init_size, one_hot)
+        self._data = Loader.import_data(dir_original, dir_segmented, init_size, one_hot)
 
     def get_all_dataset(self):
         return self._data
 
     @staticmethod
-    def import_images(dir_original, dir_segmented, init_size=None, one_hot=True):
+    def import_data(dir_original, dir_segmented, init_size=None, one_hot=True):
+        paths_original, paths_segmented = Loader.generate_paths(dir_original, dir_segmented)
+        images_original, images_segmented = Loader.extract_images(paths_original, paths_segmented, init_size, one_hot)
+
+        # Get a palette
+        image_sample_palette = Image.open(paths_segmented[0])
+        palette = image_sample_palette.getpalette()
+
+        return DataSet(images_original, images_segmented, palette)
+
+    @staticmethod
+    def generate_paths(dir_original, dir_segmented):
         paths_original = glob.glob(dir_original + "/*")
         paths_segmented = glob.glob(dir_segmented + "/*")
         if len(paths_original) == 0 or len(paths_segmented) == 0:
@@ -20,6 +31,10 @@ class Loader(object):
         filenames = list(map(lambda path: path.split(os.sep)[-1].split(".")[0], paths_segmented))
         paths_original = list(map(lambda filename: dir_original + "/" + filename + ".jpg", filenames))
 
+        return paths_original, paths_segmented
+
+    @staticmethod
+    def extract_images(paths_original, paths_segmented, init_size, one_hot):
         images_original, images_segmented = [], []
         # Load images from directory_path using generator.
         print("Loading original images", end="", flush=True)
@@ -27,31 +42,31 @@ class Loader(object):
             images_original.append(image)
             if len(images_original) % 200 == 0:
                 print(".", end="", flush=True)
-        print("Completed.", flush=True)
-        print("Loading segmented images...", end="", flush="True")
+        print(" Completed", flush=True)
+        print("Loading segmented images", end="", flush=True)
         for image in Loader.image_generator(paths_segmented, init_size, normalization=False):
             images_segmented.append(image)
             if len(images_segmented) % 200 == 0:
                 print(".", end="", flush="True")
-        print("Completed.")
+        print(" Completed")
         assert len(images_original) == len(images_segmented)
 
+        # Cast to ndarray
         images_original = np.asarray(images_original, dtype=np.float32)
         images_segmented = np.asarray(images_segmented, dtype=np.uint8)
+        # Change indices which correspond to "void" from 255
         images_segmented = np.where(images_segmented == 255, len(DataSet.CATEGORY)-1, images_segmented)
 
+        # One hot encoding using identity matrix.
         if one_hot:
-            # One hot encoding using identity matrix.
+            print("Casting to one-hot encoding... ", end="", flush=True)
             identity = np.identity(len(DataSet.CATEGORY), dtype=np.uint8)
             images_segmented = identity[images_segmented]
+            print("Done")
         else:
             pass
 
-        # Get a palette
-        image_sample_palette = Image.open(paths_segmented[0])
-        palette = image_sample_palette.getpalette()
-
-        return DataSet(images_original, images_segmented, palette)
+        return images_original, images_segmented
 
     @staticmethod
     def image_generator(file_paths, init_size=None, normalization=True):
