@@ -13,10 +13,16 @@ class Loader(object):
 
     @staticmethod
     def import_data(dir_original, dir_segmented, init_size=None, one_hot=True):
+        # Generate paths of images to load
+        # 読み込むファイルのパスリストを作成
         paths_original, paths_segmented = Loader.generate_paths(dir_original, dir_segmented)
+
+        # Extract images to ndarray using paths
+        # 画像データをndarrayに展開
         images_original, images_segmented = Loader.extract_images(paths_original, paths_segmented, init_size, one_hot)
 
-        # Get a palette
+        # Get a color palette
+        # カラーパレットを取得
         image_sample_palette = Image.open(paths_segmented[0])
         palette = image_sample_palette.getpalette()
 
@@ -36,7 +42,8 @@ class Loader(object):
     @staticmethod
     def extract_images(paths_original, paths_segmented, init_size, one_hot):
         images_original, images_segmented = [], []
-        # Load images from directory_path using generator.
+
+        # Load images from directory_path using generator
         print("Loading original images", end="", flush=True)
         for image in Loader.image_generator(paths_original, init_size):
             images_original.append(image)
@@ -54,6 +61,7 @@ class Loader(object):
         # Cast to ndarray
         images_original = np.asarray(images_original, dtype=np.float32)
         images_segmented = np.asarray(images_segmented, dtype=np.uint8)
+
         # Change indices which correspond to "void" from 255
         images_segmented = np.where(images_segmented == 255, len(DataSet.CATEGORY)-1, images_segmented)
 
@@ -76,8 +84,9 @@ class Loader(object):
         Args:
             file_paths (list[string]): File paths you want load.
             init_size (tuple(int, int)): If having a value, images are resized by init_size.
+            normalization (bool): If true, normalize images.
         Yields:
-            image (ndarray[width][height][channel]): processed image.
+            image (ndarray[width][height][channel]): Processed image
         """
         for file_path in file_paths:
             if file_path.endswith(".png") or file_path.endswith(".jpg"):
