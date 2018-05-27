@@ -5,11 +5,36 @@ import os
 
 
 class Loader(object):
-    def __init__(self, dir_original, dir_segmented, init_size=(256, 256), one_hot=True):
+    def __init__(self, dir_original, dir_segmented, init_size=(128, 128), one_hot=True):
         self._data = Loader.import_data(dir_original, dir_segmented, init_size, one_hot)
 
     def get_all_dataset(self):
         return self._data
+
+    def load_train_test(self, train_rate=0.85, shuffle=True, transpose_by_color=False):
+        """
+        `Load datasets splited into training set and test set.
+         訓練とテストに分けられたデータセットをロードします．
+        Args:
+            train_rate (float): Training rate.
+            shuffle (bool): If true, shuffle dataset.
+            transpose_by_color (bool): If True, transpose images for chainer. [channel][width][height]
+        Returns:
+            Training Set (Dataset), Test Set (Dataset)
+        """
+        if train_rate < 0.0 or train_rate > 1.0:
+            raise ValueError("train_rate must be from 0.0 to 1.0.")
+        if transpose_by_color:
+            self._data.transpose_by_color()
+        if shuffle:
+            self._data.shuffle()
+
+        train_size = int(self._data.images_original.shape[0] * train_rate)
+        data_size = int(len(self._data.images_original))
+        train_set = self._data.perm(0, train_size)
+        test_set = self._data.perm(train_size, data_size)
+
+        return train_set, test_set
 
     @staticmethod
     def import_data(dir_original, dir_segmented, init_size=None, one_hot=True):
@@ -101,7 +126,7 @@ class Loader(object):
                 if image.mode == "RGBA":
                     image = image.convert("RGB")
                     # TODO(tks10): Deal with an alpha channel.
-                    # If original pixel's values aren't 255, contrary to expectations, the pixels may be not white.
+                    # If original pixel's values are 0, contrary to expectations, the pixels may be converted black.
                 image = np.asarray(image)
                 if normalization:
                     image = image / 255.0
@@ -143,8 +168,8 @@ class DataSet(object):
 
     def __init__(self, images_original, images_segmented, image_palette):
         assert len(images_original) == len(images_segmented), "images and labels must have same length."
-        self._images_original = np.asarray(images_original, dtype=np.float32)
-        self._images_segmented = np.asarray(images_segmented, dtype=np.float32)
+        self._images_original = images_original
+        self._images_segmented = images_segmented
         self._image_palette = image_palette
 
     @property
@@ -156,8 +181,16 @@ class DataSet(object):
         return self._images_segmented
 
     @property
+    def palette(self):
+        return self._image_palette
+
+    @property
     def length(self):
-        return len(self._images)
+        return len(self._images_original)
+
+    @staticmethod
+    def length_category():
+        return len(DataSet.CATEGORY)
 
     def print_information(self):
         print("****** Dataset Information ******")
@@ -166,22 +199,20 @@ class DataSet(object):
     def __add__(self, other):
         images_original = np.concatenate([self.images_original, other.images_original])
         images_segmented = np.concatenate([self.images_segmented, other.images_segmented])
-        return DataSet(images_original, images_segmented)
+        return DataSet(images_original, images_segmented, self._image_palette)
 
     def shuffle(self):
-        list_packed = list(zip(self._images_original, self._images_segmented))
-        np.random.shuffle(list_packed)
-        images_original, images_segmented, labels = zip(*list_packed)
-        return DataSet(images_original, images_segmented)
+        idx = np.arange(self._images_original.shape[0])
+        np.random.shuffle(idx)
+        self._images_original, self._images_segmented = self._images_original[idx], self._images_segmented[idx]
 
     def transpose_by_color(self):
-        image_original = self._images_original.transpose(0, 3, 1, 2)
-        image_segmented = self._images_segmented.transpose(0, 3, 1, 2)
-        return DataSet(image_original, image_segmented)
+        self._images_original = self._images_original.transpose(0, 3, 1, 2)
+        self._images_segmented = self._images_segmented.transpose(0, 3, 1, 2)
 
     def perm(self, start, end):
         end = min(end, len(self._images_original))
-        return DataSet(self._images_original[start:end], self._images_segmented[start:end])
+        return DataSet(self._images_original[start:end], self._images_segmented[start:end], self._image_palette)
 
     def __call__(self, batch_size=20, shuffle=True):
         """
@@ -196,15 +227,16 @@ class DataSet(object):
 
         if batch_size < 1:
             raise ValueError("batch_size must be more than 1.")
-        data = self.shuffle() if shuffle else self
+        if shuffle:
+            self.shuffle()
 
         for start in range(0, self.length, batch_size):
-            permed = data.perm(start, start+batch_size)
-            yield permed
+            yield self.perm(start, start+batch_size)
 
 
 if __name__ == "__main__":
     dataset_loader = Loader(dir_original="../data_set/VOCdevkit/VOC2012/JPEGImages",
                             dir_segmented="../data_set/VOCdevkit/VOC2012/SegmentationClass")
-    data = dataset_loader.get_all_dataset()
-    data.print_information()
+    train, test = dataset_loader.load_train_test()
+    train.print_information()
+    test.print_information()
