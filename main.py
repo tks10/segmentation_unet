@@ -8,6 +8,7 @@ from PIL import Image
 
 from util import loader as ld
 from util import model
+from util import repoter as rp
 
 FLAGS = None
 DIR_TARGET = "target"
@@ -20,41 +21,18 @@ def load_dataset():
     return loader.load_train_test(shuffle=False)
 
 
-def get_concat(im1, im2, palette, mode):
-    if mode == "P":
-        dst = Image.new("P", (im1.width + im2.width, im1.height))
-        dst.paste(im1, (0, 0))
-        dst.paste(im2, (im1.width, 0))
-        dst.putpalette(palette)
-    elif mode == "RGB":
-        dst = Image.new("RGB", (im1.width + im2.width, im1.height))
-        dst.paste(im1, (0, 0))
-        dst.paste(im2, (im1.width, 0))
-    return dst
-
-
-def cast_to_aaa(nlist, palette):
-    assert len(nlist.shape) == 3
-    res = np.argmax(nlist, axis=2)
-    image = Image.fromarray(np.uint8(res), mode="P")
-    image.putpalette(palette)
-    return image
-
-
-def show_imageset(image_in_np, image_out_np, image_tc_np, palette):
-    image_out, image_tc = cast_to_aaa(image_out_np, palette), cast_to_aaa(image_tc_np, palette)
-    image_concated = get_concat(image_out, image_tc, palette, "P").convert("RGB")
-    get_concat(Image.fromarray(np.uint8(image_in_np * 255), mode="RGB"), image_concated, None, "RGB").show()
-
-
 def main(_):
 
     # Load training and test data
     # 訓練とテストデータを読み込みます
     train, test = load_dataset()
-    valid = train.perm(0, 10)
+    valid = train.perm(0, 30)
     test = test.perm(0, 150)
-    print(test.images_original.shape)
+
+    # Create Reporter Object
+    reporter = rp.Reporter()
+    accuracy_fig = reporter.create_figure("Accuracy", ("epoch", "accuracy"), ["train", "test"])
+    loss_fig = reporter.create_figure("Loss", ("epoch", "loss"), ["train", "test"])
 
     # Whether or not using a GPU
     # GPUを使用するか
@@ -112,11 +90,20 @@ def main(_):
             print("Epoch:", epoch)
             print("[Train] Loss:", loss_train, " Accuracy:", accuracy_train)
             print("[Test]  Loss:", loss_test, "Accuracy:", accuracy_test)
+            accuracy_fig.add([accuracy_train, accuracy_test], is_update=True)
+            loss_fig.add([loss_train, loss_test], is_update=True)
             if epoch % 3 == 0:
-                idx = random.randrange(10)
-                outputs = sess.run(model_unet.outputs, feed_dict={model_unet.inputs: [train.images_original[idx]],
-                                                                  model_unet.is_training: False})
-                show_imageset(train.images_original[idx], outputs[0], train.images_segmented[idx], train.palette)
+                idx_train = random.randrange(10)
+                idx_test = random.randrange(100)
+                outputs_train = sess.run(model_unet.outputs,
+                                         feed_dict={model_unet.inputs: [train.images_original[idx_train]],
+                                                    model_unet.is_training: False})
+                outputs_test = sess.run(model_unet.outputs,
+                                        feed_dict={model_unet.inputs: [test.images_original[idx_test]],
+                                                   model_unet.is_training: False})
+                train_set = [train.images_original[idx_train], outputs_train[0], train.images_segmented[idx_train]]
+                test_set = [test.images_original[idx_test], outputs_test[0], test.images_segmented[idx_test]]
+                reporter.save_image_from_ndarray(train_set, test_set, train.palette, epoch)
 
     # Test trained model
     # 訓練済みモデルの評価
