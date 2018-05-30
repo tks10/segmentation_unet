@@ -2,7 +2,7 @@ from PIL import Image
 import numpy as np
 import glob
 import os
-
+from util import image_augmenter as ia
 
 class Loader(object):
     def __init__(self, dir_original, dir_segmented, init_size=(128, 128), one_hot=True):
@@ -51,7 +51,8 @@ class Loader(object):
         image_sample_palette = Image.open(paths_segmented[0])
         palette = image_sample_palette.getpalette()
 
-        return DataSet(images_original, images_segmented, palette)
+        return DataSet(images_original, images_segmented, palette,
+                       augmenter=ia.ImageAugmenter(size=init_size, class_count=len(DataSet.CATEGORY)))
 
     @staticmethod
     def generate_paths(dir_original, dir_segmented):
@@ -70,7 +71,7 @@ class Loader(object):
 
         # Load images from directory_path using generator
         print("Loading original images", end="", flush=True)
-        for image in Loader.image_generator(paths_original, init_size):
+        for image in Loader.image_generator(paths_original, init_size, antialias=True):
             images_original.append(image)
             if len(images_original) % 200 == 0:
                 print(".", end="", flush=True)
@@ -102,7 +103,16 @@ class Loader(object):
         return images_original, images_segmented
 
     @staticmethod
-    def image_generator(file_paths, init_size=None, normalization=True):
+    def cast_to_index(ndarray):
+        return np.argmax(ndarray, axis=2)
+
+    @staticmethod
+    def cast_to_onehot(ndarray):
+        identity = np.identity(len(DataSet.CATEGORY), dtype=np.uint8)
+        return identity[ndarray]
+
+    @staticmethod
+    def image_generator(file_paths, init_size=None, normalization=True, antialias=False):
         """
         `A generator which yields images deleted an alpha channel and resized.
          アルファチャネル削除、リサイズ(任意)処理を行った画像を返します
@@ -110,6 +120,7 @@ class Loader(object):
             file_paths (list[string]): File paths you want load.
             init_size (tuple(int, int)): If having a value, images are resized by init_size.
             normalization (bool): If true, normalize images.
+            antialias (bool): Antialias.
         Yields:
             image (ndarray[width][height][channel]): Processed image
         """
@@ -121,7 +132,10 @@ class Loader(object):
                 image = Loader.crop_to_square(image)
                 # resize
                 if init_size is not None and init_size != image.size:
-                    image = image.resize(init_size)
+                    if antialias:
+                        image = image.resize(init_size, Image.ANTIALIAS)
+                    else:
+                        image = image.resize(init_size)
                 # delete alpha channel
                 if image.mode == "RGBA":
                     image = image.convert("RGB")
@@ -166,11 +180,12 @@ class DataSet(object):
         "void"
     )
 
-    def __init__(self, images_original, images_segmented, image_palette):
+    def __init__(self, images_original, images_segmented, image_palette, augmenter=None):
         assert len(images_original) == len(images_segmented), "images and labels must have same length."
         self._images_original = images_original
         self._images_segmented = images_segmented
         self._image_palette = image_palette
+        self._augmenter = augmenter
 
     @property
     def images_original(self):
@@ -199,7 +214,7 @@ class DataSet(object):
     def __add__(self, other):
         images_original = np.concatenate([self.images_original, other.images_original])
         images_segmented = np.concatenate([self.images_segmented, other.images_segmented])
-        return DataSet(images_original, images_segmented, self._image_palette)
+        return DataSet(images_original, images_segmented, self._image_palette, self._augmenter)
 
     def shuffle(self):
         idx = np.arange(self._images_original.shape[0])
@@ -212,9 +227,10 @@ class DataSet(object):
 
     def perm(self, start, end):
         end = min(end, len(self._images_original))
-        return DataSet(self._images_original[start:end], self._images_segmented[start:end], self._image_palette)
+        return DataSet(self._images_original[start:end], self._images_segmented[start:end], self._image_palette,
+                       self._augmenter)
 
-    def __call__(self, batch_size=20, shuffle=True):
+    def __call__(self, batch_size=20, shuffle=True, augment=True):
         """
         `A generator which yields a batch. The batch is shuffled as default.
          バッチを返すジェネレータです。 デフォルトでバッチはシャッフルされます。
@@ -231,7 +247,12 @@ class DataSet(object):
             self.shuffle()
 
         for start in range(0, self.length, batch_size):
-            yield self.perm(start, start+batch_size)
+            batch = self.perm(start, start+batch_size)
+            if augment:
+                assert self._augmenter is not None, "you have to set an augmenter."
+                yield self._augmenter.augment_dataset(batch)
+            else:
+                yield batch
 
 
 if __name__ == "__main__":

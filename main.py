@@ -5,6 +5,7 @@ import random
 import tensorflow as tf
 import numpy as np
 from PIL import Image
+import datetime
 
 from util import loader as ld
 from util import model
@@ -58,7 +59,7 @@ def main(_):
     # Initialize session
     # セッションの初期化をします
     gpu_config = tf.ConfigProto(gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.7), device_count={'GPU': 1},
-                                log_device_placement=True, allow_soft_placement=True)
+                                log_device_placement=False, allow_soft_placement=True)
     sess = tf.InteractiveSession(config=gpu_config) if gpu else tf.InteractiveSession()
     tf.global_variables_initializer().run()
 
@@ -75,10 +76,11 @@ def main(_):
         for batch in train(batch_size=batch_size):
             # バッチデータの展開
             inputs = batch.images_original
-            teacher = np.float32(batch.images_segmented)
+            teacher = batch.images_segmented
             # Training
             sess.run(train_step, feed_dict={model_unet.inputs: inputs, model_unet.teacher: teacher,
                                             model_unet.is_training: True})
+
         # Evaluation
         # 評価
 
