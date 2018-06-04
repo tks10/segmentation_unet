@@ -3,72 +3,75 @@ from util import loader as ld
 
 
 class UNet:
-    def __init__(self, size=(128, 128)):
-        self.model = self.create_model(size)
+    def __init__(self, size=(128, 128), l2_reg=None):
+        self.model = self.create_model(size, l2_reg)
 
     @staticmethod
-    def create_model(size):
+    def create_model(size, l2_reg):
         inputs = tf.placeholder(tf.float32, [None, size[0], size[1], 3])
-        teacher = tf.placeholder(tf.float32, [None, size[0], size[1], ld.DataSet.length_category()])
+        teacher = tf.placeholder(tf.float32, [None, size[0], size[1], len(ld.DataSet.CATEGORY)])
         is_training = tf.placeholder(tf.bool)
 
-        # 256, 256, 3
-        conv1_1 = UNet.bn(UNet.conv(inputs, filters=64), is_training)
-        conv1_2 = UNet.conv(conv1_1, filters=64)
+        # 1, 1, 3
+        conv1_1 = UNet.conv(inputs, filters=64, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
+        conv1_2 = UNet.conv(conv1_1, filters=64, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
         pool1 = UNet.pool(conv1_2)
 
-        # 128, 128, 64
-        conv2_1 = UNet.bn(UNet.conv(pool1, filters=128), is_training)
-        conv2_2 = UNet.conv(conv2_1, filters=128)
+        # 1/2, 1/2, 64
+        conv2_1 = UNet.conv(pool1, filters=128, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
+        conv2_2 = UNet.conv(conv2_1, filters=128, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
         pool2 = UNet.pool(conv2_2)
 
-        # 64, 64, 128
-        conv3_1 = UNet.bn(UNet.conv(pool2, filters=256), is_training)
-        conv3_2 = UNet.conv(conv3_1, filters=256)
+        # 1/4, 1/4, 128
+        conv3_1 = UNet.conv(pool2, filters=256, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
+        conv3_2 = UNet.conv(conv3_1, filters=256, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
         pool3 = UNet.pool(conv3_2)
 
-        # 32, 32, 256
-        conv4_1 = UNet.bn(UNet.conv(pool3, filters=512), is_training)
-        conv4_2 = UNet.conv(conv4_1, filters=512)
+        # 1/8, 1/8, 256
+        conv4_1 = UNet.conv(pool3, filters=512, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
+        conv4_2 = UNet.conv(conv4_1, filters=512, l2_reg_scale=l2_reg, batchnorm_istraining=is_training)
         pool4 = UNet.pool(conv4_2)
 
-        # 16, 16, 512
-        conv5_1 = UNet.bn(UNet.conv(pool4, filters=1024), is_training)
-        conv5_2 = UNet.conv(conv5_1, filters=1024)
-        concated1 = tf.concat([UNet.conv_transpose(conv5_2, filters=512),
-                               tf.map_fn(lambda tensor: tf.image.central_crop(tensor, 1.0), conv4_2)], axis=3)
+        # 1/16, 1/16, 512
+        conv5_1 = UNet.conv(pool4, filters=1024, l2_reg_scale=l2_reg)
+        conv5_2 = UNet.conv(conv5_1, filters=1024, l2_reg_scale=l2_reg)
+        concated1 = tf.concat([UNet.conv_transpose(conv5_2, filters=512, l2_reg_scale=l2_reg), conv4_2], axis=3)
 
-        conv_up1_1 = UNet.conv(concated1, filters=512)
-        conv_up1_2 = UNet.conv(conv_up1_1, filters=512)
-        concated2 = tf.concat([UNet.conv_transpose(conv_up1_2, filters=256),
-                               tf.map_fn(lambda tensor: tf.image.central_crop(tensor, 1.0), conv3_2)], axis=3)
+        conv_up1_1 = UNet.conv(concated1, filters=512, l2_reg_scale=l2_reg)
+        conv_up1_2 = UNet.conv(conv_up1_1, filters=512, l2_reg_scale=l2_reg)
+        concated2 = tf.concat([UNet.conv_transpose(conv_up1_2, filters=256, l2_reg_scale=l2_reg), conv3_2], axis=3)
 
-        conv_up2_1 = UNet.conv(concated2, filters=256)
-        conv_up2_2 = UNet.conv(conv_up2_1, filters=256)
-        concated3 = tf.concat([UNet.conv_transpose(conv_up2_2, filters=128),
-                               tf.map_fn(lambda tensor: tf.image.central_crop(tensor, 1.0), conv2_2)], axis=3)
+        conv_up2_1 = UNet.conv(concated2, filters=256, l2_reg_scale=l2_reg)
+        conv_up2_2 = UNet.conv(conv_up2_1, filters=256, l2_reg_scale=l2_reg)
+        concated3 = tf.concat([UNet.conv_transpose(conv_up2_2, filters=128, l2_reg_scale=l2_reg), conv2_2], axis=3)
 
-        conv_up3_1 = UNet.conv(concated3, filters=128)
-        conv_up3_2 = UNet.conv(conv_up3_1, filters=128)
-        concated4 = tf.concat([UNet.conv_transpose(conv_up3_2, filters=64),
-                               tf.map_fn(lambda tensor: tf.image.central_crop(tensor, 1.0), conv1_2)], axis=3)
+        conv_up3_1 = UNet.conv(concated3, filters=128, l2_reg_scale=l2_reg)
+        conv_up3_2 = UNet.conv(conv_up3_1, filters=128, l2_reg_scale=l2_reg)
+        concated4 = tf.concat([UNet.conv_transpose(conv_up3_2, filters=64, l2_reg_scale=l2_reg), conv1_2], axis=3)
 
-        conv_up4_1 = UNet.conv(concated4, filters=64)
-        conv_up4_2 = UNet.conv(conv_up4_1, filters=64)
-        outputs = UNet.conv(conv_up4_2, filters=ld.DataSet.length_category(),
-                            kernel_size=[1, 1], activation=None)
+        conv_up4_1 = UNet.conv(concated4, filters=64, l2_reg_scale=l2_reg)
+        conv_up4_2 = UNet.conv(conv_up4_1, filters=64, l2_reg_scale=l2_reg)
+        outputs = UNet.conv(conv_up4_2, filters=ld.DataSet.length_category(), kernel_size=[1, 1], activation=None)
 
         return Model(inputs, outputs, teacher, is_training)
 
     @staticmethod
-    def conv(inputs, filters, kernel_size=[3, 3], activation=tf.nn.relu):
+    def conv(inputs, filters, kernel_size=[3, 3], activation=tf.nn.relu, l2_reg_scale=None, batchnorm_istraining=None):
+        if l2_reg_scale is None:
+            regularizer = None
+        else:
+            regularizer = tf.contrib.layers.l2_regularizer(scale=l2_reg_scale)
         conved = tf.layers.conv2d(
             inputs=inputs,
             filters=filters,
             kernel_size=kernel_size,
             padding="same",
             activation=activation,
+            kernel_regularizer=regularizer
         )
+        if batchnorm_istraining is not None:
+            conved = UNet.bn(conved, batchnorm_istraining)
+
         return conved
 
     @staticmethod
@@ -90,14 +93,19 @@ class UNet:
         return pooled
 
     @staticmethod
-    def conv_transpose(inputs, filters):
+    def conv_transpose(inputs, filters, l2_reg_scale=None):
+        if l2_reg_scale is None:
+            regularizer = None
+        else:
+            regularizer = tf.contrib.layers.l2_regularizer(scale=l2_reg_scale)
         conved = tf.layers.conv2d_transpose(
             inputs=inputs,
             filters=filters,
             strides=[2, 2],
             kernel_size=[2, 2],
             padding='same',
-            activation=tf.nn.relu
+            activation=tf.nn.relu,
+            kernel_regularizer=regularizer
         )
         return conved
 

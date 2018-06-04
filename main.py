@@ -10,28 +10,30 @@ import datetime
 from util import loader as ld
 from util import model
 from util import repoter as rp
+from util import parameter
 
 FLAGS = None
-DIR_TARGET = "target"
-DIR_OTHERS = "others"
+PARAMETER_FILE = "parameter.ini"
 
 
-def load_dataset():
+def load_dataset(train_rate):
     loader = ld.Loader(dir_original="data_set/VOCdevkit/VOC2012/JPEGImages",
                        dir_segmented="data_set/VOCdevkit/VOC2012/SegmentationClass")
-    return loader.load_train_test(shuffle=False)
+    return loader.load_train_test(train_rate=train_rate, shuffle=False)
 
 
 def main(_):
+    # Get parameters
+    params = parameter.Parameter(PARAMETER_FILE, check=True)
 
     # Load training and test data
     # 訓練とテストデータを読み込みます
-    train, test = load_dataset()
+    train, test = load_dataset(train_rate=params.get("train_rate"))
     valid = train.perm(0, 30)
     test = test.perm(0, 150)
 
     # Create Reporter Object
-    reporter = rp.Reporter()
+    reporter = rp.Reporter(params_file=PARAMETER_FILE)
     accuracy_fig = reporter.create_figure("Accuracy", ("epoch", "accuracy"), ["train", "test"])
     loss_fig = reporter.create_figure("Loss", ("epoch", "loss"), ["train", "test"])
 
@@ -42,7 +44,7 @@ def main(_):
 
     # Create a model
     # モデルの生成
-    model_unet = model.UNet().model
+    model_unet = model.UNet(l2_reg=params.get("l2_regularization")).model
 
     # Set loss function and optimizer
     # 誤差関数とオプティマイザの設定をします
@@ -65,15 +67,16 @@ def main(_):
 
     # Train model
     # モデルの訓練
-    epochs = 2000
-    batch_size = 32
+    epochs = params.get("epoch")
+    batch_size = params.get("batch_size")
+    is_augment = params.get("augmentation")
     train_dict = {model_unet.inputs: valid.images_original, model_unet.teacher: valid.images_segmented,
                   model_unet.is_training: False}
     test_dict = {model_unet.inputs: test.images_original, model_unet.teacher: test.images_segmented,
                  model_unet.is_training: False}
 
     for epoch in range(epochs):
-        for batch in train(batch_size=batch_size):
+        for batch in train(batch_size=batch_size, augment=is_augment):
             # バッチデータの展開
             inputs = batch.images_original
             teacher = batch.images_segmented
@@ -83,7 +86,6 @@ def main(_):
 
         # Evaluation
         # 評価
-
         if epoch % 1 == 0:
             loss_train = sess.run(cross_entropy, feed_dict=train_dict)
             loss_test = sess.run(cross_entropy, feed_dict=test_dict)
@@ -105,7 +107,8 @@ def main(_):
                                                    model_unet.is_training: False})
                 train_set = [train.images_original[idx_train], outputs_train[0], train.images_segmented[idx_train]]
                 test_set = [test.images_original[idx_test], outputs_test[0], test.images_segmented[idx_test]]
-                reporter.save_image_from_ndarray(train_set, test_set, train.palette, epoch)
+                reporter.save_image_from_ndarray(train_set, test_set, train.palette, epoch,
+                                                 index_void=len(ld.DataSet.CATEGORY)-1)
 
     # Test trained model
     # 訓練済みモデルの評価

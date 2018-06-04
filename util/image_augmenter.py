@@ -37,6 +37,8 @@ class ImageAugmenter:
             idx = random.randrange(ImageAugmenter.NUMBER_OF_AUGMENT)
         else:
             assert len(method) <= ImageAugmenter.NUMBER_OF_AUGMENT, "method is too many."
+            if ImageAugmenter.NONE not in method:
+                method.append(ImageAugmenter.NONE)
             idx = random.choice(method)
 
         op = self._operation[idx]

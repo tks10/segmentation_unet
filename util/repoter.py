@@ -3,6 +3,7 @@ import numpy as np
 import datetime
 import os
 import matplotlib.pyplot as plt
+import shutil
 
 
 class Reporter:
@@ -14,7 +15,7 @@ class Reporter:
     IMAGE_PREFIX = "epoch_"
     IMAGE_EXTENSION = ".png"
 
-    def __init__(self, result_dir=None):
+    def __init__(self, result_dir=None, params_file=None):
         if result_dir is None:
             result_dir = Reporter.generate_dir_name()
         self._root_dir = self.ROOT_DIR
@@ -28,6 +29,8 @@ class Reporter:
         self.create_dirs()
 
         self._matplot_manager = MatPlotManager(self._learning_dir)
+        if params_file is not None:
+            self.save_params(params_file)
 
     @staticmethod
     def generate_dir_name():
@@ -42,6 +45,9 @@ class Reporter:
         os.makedirs(self._learning_dir)
         os.makedirs(self._info_dir)
 
+    def save_params(self, filename):
+        shutil.copyfile(filename, self._parameter)
+
     def save_image(self, train, test, epoch):
         file_name = self.IMAGE_PREFIX + str(epoch) + self.IMAGE_EXTENSION
         train_filename = os.path.join(self._image_train_dir, file_name)
@@ -49,26 +55,14 @@ class Reporter:
         train.save(train_filename)
         test.save(test_filename)
 
-    def save_image_from_ndarray(self, train_set, test_set, palette, epoch):
+    def save_image_from_ndarray(self, train_set, test_set, palette, epoch, index_void=None):
         assert len(train_set) == len(test_set) == 3
-        train_image = Reporter.get_imageset(train_set[0], train_set[1], train_set[2], palette)
-        test_image = Reporter.get_imageset(test_set[0], test_set[1], test_set[2], palette)
+        train_image = Reporter.get_imageset(train_set[0], train_set[1], train_set[2], palette, index_void)
+        test_image = Reporter.get_imageset(test_set[0], test_set[1], test_set[2], palette, index_void)
         self.save_image(train_image, test_image, epoch)
 
     def create_figure(self, title, xylabels, labels, filename=None):
         return self._matplot_manager.add_figure(title, xylabels, labels, filename=filename)
-
-    def save_grapdh(self, series, labels, xylabels, title, filename=None):
-        assert len(series) == len(labels) and len(xylabels) == 2
-        if filename is None:
-            filename = title
-        for s, l in zip(series, labels):
-            plt.plot(s, label=l)
-        plt.legend()
-        plt.xlabel(xylabels[0])
-        plt.ylabel(xylabels[1])
-        plt.title(title)
-        plt.savefig(os.path.join(self._learning_dir, filename+self.IMAGE_EXTENSION))
 
     @staticmethod
     def concat_images(im1, im2, palette, mode):
@@ -86,17 +80,20 @@ class Reporter:
         return dst
 
     @staticmethod
-    def cast_to_pil(ndarray, palette):
+    def cast_to_pil(ndarray, palette, index_void=None):
         assert len(ndarray.shape) == 3
         res = np.argmax(ndarray, axis=2)
+        if index_void is not None:
+            res = np.where(res == index_void, 0, res)
         image = Image.fromarray(np.uint8(res), mode="P")
         image.putpalette(palette)
         return image
 
     @staticmethod
-    def get_imageset(image_in_np, image_out_np, image_tc_np, palette):
+    def get_imageset(image_in_np, image_out_np, image_tc_np, palette, index_void=None):
         assert image_in_np.shape[:2] == image_out_np.shape[:2] == image_tc_np.shape[:2]
-        image_out, image_tc = Reporter.cast_to_pil(image_out_np, palette), Reporter.cast_to_pil(image_tc_np, palette)
+        image_out, image_tc = Reporter.cast_to_pil(image_out_np, palette, index_void),\
+                              Reporter.cast_to_pil(image_tc_np, palette, index_void)
         image_concated = Reporter.concat_images(image_out, image_tc, palette, "P").convert("RGB")
         image_in_pil = Image.fromarray(np.uint8(image_in_np * 255), mode="RGB")
         image_result = Reporter.concat_images(image_in_pil, image_concated, None, "RGB")
@@ -134,7 +131,7 @@ class MatPlot:
 
     def add(self, series, is_update=False):
         series = np.asarray(series).reshape((len(series), 1))
-        assert series.shape[0] == self._series.shape[0], "series must have same length"
+        assert series.shape[0] == self._series.shape[0], "series must have same length."
         self._series = np.concatenate([self._series, series], axis=1)
         if is_update:
             self.save()
