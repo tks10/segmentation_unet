@@ -4,6 +4,7 @@ import glob
 import os
 from util import image_augmenter as ia
 
+
 class Loader(object):
     def __init__(self, dir_original, dir_segmented, init_size=(128, 128), one_hot=True):
         self._data = Loader.import_data(dir_original, dir_segmented, init_size, one_hot)
@@ -130,7 +131,7 @@ class Loader(object):
                 image = Image.open(file_path)
                 # to square
                 image = Loader.crop_to_square(image)
-                # resize
+                # resize by init_size
                 if init_size is not None and init_size != image.size:
                     if antialias:
                         image = image.resize(init_size, Image.ANTIALIAS)
@@ -139,8 +140,6 @@ class Loader(object):
                 # delete alpha channel
                 if image.mode == "RGBA":
                     image = image.convert("RGB")
-                    # TODO(tks10): Deal with an alpha channel.
-                    # If original pixel's values are 0, contrary to expectations, the pixels may be converted black.
                 image = np.asarray(image)
                 if normalization:
                     image = image / 255.0
@@ -250,7 +249,7 @@ class DataSet(object):
             batch = self.perm(start, start+batch_size)
             if augment:
                 assert self._augmenter is not None, "you have to set an augmenter."
-                yield self._augmenter.augment_dataset(batch)
+                yield self._augmenter.augment_dataset(batch, method=[ia.ImageAugmenter.NONE, ia.ImageAugmenter.FLIP])
             else:
                 yield batch
 
