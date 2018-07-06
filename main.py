@@ -39,8 +39,10 @@ def main(_):
 
     # Whether or not using a GPU
     # GPUを使用するか
-    gpu = FLAGS.gpu
-    gpu = True
+    if "gpu" in dir(FLAGS):
+        gpu = FLAGS.gpu
+    else:
+        gpu = True
 
     # Create a model
     # モデルの生成
@@ -120,7 +122,6 @@ def main(_):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_dir', type=str, default='images', help='Directory for storing input data')
     parser.add_argument('--gpu', action='store_true', help='Use gpu')
     FLAGS, unparsed = parser.parse_known_args()
     tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
