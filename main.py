@@ -8,9 +8,7 @@ from util import model
 from util import repoter as rp
 from util import parameter
 
-FLAGS = None
 PARAMETER_FILE = "parameter.ini"
-
 
 def load_dataset(train_rate):
     loader = ld.Loader(dir_original="data_set/VOCdevkit/VOC2012/JPEGImages",
@@ -35,10 +33,7 @@ def main(_):
 
     # Whether or not using a GPU
     # GPUを使用するか
-    if "gpu" in dir(FLAGS):
-        gpu = FLAGS.gpu
-    else:
-        gpu = True
+    gpu = True
 
     # Create a model
     # モデルの生成
@@ -119,5 +114,5 @@ def main(_):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', action='store_true', help='Use gpu')
-    FLAGS, unparsed = parser.parse_known_args()
-    tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+
+    tf.app.run(main=main, argv=[sys.argv[0]])
