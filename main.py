@@ -1,11 +1,7 @@
 import argparse
 import sys
-import os
 import random
 import tensorflow as tf
-import numpy as np
-from PIL import Image
-import datetime
 
 from util import loader as ld
 from util import model
