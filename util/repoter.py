@@ -3,7 +3,6 @@ import numpy as np
 import datetime
 import os
 import matplotlib.pyplot as plt
-import shutil
 
 
 class Reporter:
@@ -15,7 +14,7 @@ class Reporter:
     IMAGE_PREFIX = "epoch_"
     IMAGE_EXTENSION = ".png"
 
-    def __init__(self, result_dir=None, params_file=None):
+    def __init__(self, result_dir=None, parser=None):
         if result_dir is None:
             result_dir = Reporter.generate_dir_name()
         self._root_dir = self.ROOT_DIR
@@ -29,8 +28,8 @@ class Reporter:
         self.create_dirs()
 
         self._matplot_manager = MatPlotManager(self._learning_dir)
-        if params_file is not None:
-            self.save_params(params_file)
+        if parser is not None:
+            self.save_params(self._parameter, parser)
 
     @staticmethod
     def generate_dir_name():
@@ -45,8 +44,18 @@ class Reporter:
         os.makedirs(self._learning_dir)
         os.makedirs(self._info_dir)
 
-    def save_params(self, filename):
-        shutil.copyfile(filename, self._parameter)
+    @staticmethod
+    def save_params(filename, parser):
+        parameters = list()
+        parameters.append("Number of epochs:" + str(parser.epoch))
+        parameters.append("Batch size:" + str(parser.batchsize))
+        parameters.append("Training rate:" + str(parser.trainrate))
+        parameters.append("Augmentation:" + str(parser.augmentation))
+        parameters.append("L2 regularization:" + str(parser.l2reg))
+        output = "\n".join(parameters)
+
+        with open(filename, mode='w') as f:
+            f.write(output)
 
     def save_image(self, train, test, epoch):
         file_name = self.IMAGE_PREFIX + str(epoch) + self.IMAGE_EXTENSION

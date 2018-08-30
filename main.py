@@ -1,14 +1,13 @@
 import argparse
-import sys
 import random
 import tensorflow as tf
 
 from util import loader as ld
 from util import model
 from util import repoter as rp
-from util import parameter
 
 PARAMETER_FILE = "parameter.ini"
+
 
 def load_dataset(train_rate):
     loader = ld.Loader(dir_original="data_set/VOCdevkit/VOC2012/JPEGImages",
@@ -16,28 +15,34 @@ def load_dataset(train_rate):
     return loader.load_train_test(train_rate=train_rate, shuffle=False)
 
 
-def main(_):
+def train(parser):
     # Get parameters
-    params = parameter.Parameter(PARAMETER_FILE, check=True)
+    print(parser.gpu)
+    print(parser.epoch)
+    print(parser.batchsize)
+    print(parser.trainrate)
+    print(parser.augmentation)
+    print(parser.l2reg)
 
-    # Load training and test data
     # 訓練とテストデータを読み込みます
-    train, test = load_dataset(train_rate=params.get("train_rate"))
+    train, test = load_dataset(train_rate=parser.trainrate)
     valid = train.perm(0, 30)
     test = test.perm(0, 150)
 
     # Create Reporter Object
-    reporter = rp.Reporter(params_file=PARAMETER_FILE)
+    reporter = rp.Reporter(parser=parser)
     accuracy_fig = reporter.create_figure("Accuracy", ("epoch", "accuracy"), ["train", "test"])
     loss_fig = reporter.create_figure("Loss", ("epoch", "loss"), ["train", "test"])
 
+    exit(0)
+
     # Whether or not using a GPU
     # GPUを使用するか
-    gpu = True
+    gpu = parser.gpu
 
     # Create a model
     # モデルの生成
-    model_unet = model.UNet(l2_reg=params.get("l2_regularization")).model
+    model_unet = model.UNet(l2_reg=parser.l2reg).model
 
     # Set loss function and optimizer
     # 誤差関数とオプティマイザの設定をします
@@ -60,9 +65,9 @@ def main(_):
 
     # Train model
     # モデルの訓練
-    epochs = params.get("epoch")
-    batch_size = params.get("batch_size")
-    is_augment = params.get("augmentation")
+    epochs = parser.epoch
+    batch_size = parser.batchsize
+    is_augment = parser.augmentation
     train_dict = {model_unet.inputs: valid.images_original, model_unet.teacher: valid.images_segmented,
                   model_unet.is_training: False}
     test_dict = {model_unet.inputs: test.images_original, model_unet.teacher: test.images_segmented,
@@ -111,8 +116,24 @@ def main(_):
     print("[Test]  Loss:", loss_test, "Accuracy:", accuracy_test)
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--gpu', action='store_true', help='Use gpu')
+def get_parser():
+    parser = argparse.ArgumentParser(
+        prog='Image segmentation using U-Net',
+        usage='python main.py',
+        description='This module demonstrates image segmentation using U-Net.',
+        add_help=True
+    )
 
-    tf.app.run(main=main, argv=[sys.argv[0]])
+    parser.add_argument('--gpu', action='store_true', help='Using GPUs')
+    parser.add_argument('--epoch', type=int, default=250, help='Number of epochs')
+    parser.add_argument('--batchsize', type=int, default=32, help='Batch size')
+    parser.add_argument('--trainrate', type=float, default=0.85, help='Training rate')
+    parser.add_argument('--augmentation', action='store_true', help='Number of epochs')
+    parser.add_argument('--l2reg', type=float, default=0.0001, help='L2 regularization')
+
+    return parser
+
+
+if __name__ == '__main__':
+    parser = get_parser().parse_args()
+    train(parser)
