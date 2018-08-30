@@ -6,8 +6,6 @@ from util import loader as ld
 from util import model
 from util import repoter as rp
 
-PARAMETER_FILE = "parameter.ini"
-
 
 def load_dataset(train_rate):
     loader = ld.Loader(dir_original="data_set/VOCdevkit/VOC2012/JPEGImages",
