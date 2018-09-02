@@ -7,4 +7,11 @@ An article about this implementation is [here](https://qiita.com/tktktks10/items
 
 
 # Usage
+To show how to run.
+
+`python main.py --help`
+
+
+To run with data augmentation using GPUs.
+
 `python main.py --gpu --augmentation`
