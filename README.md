@@ -1,4 +1,4 @@
-# Summary
+# Semantic Segmentation using U-Net
 This repository implements semantic segmentation on Pascal VOC2012 using U-Net.
 
 U-Net is an encoder-decoder model consisted of only convolutions, without fully connected layers.
