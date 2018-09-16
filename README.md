@@ -7,7 +7,7 @@ An article about this implementation is [here](https://qiita.com/tktktks10/items
 
 Semantic segmentation is a kind of image processing as below.
 
-![original](https://raw.githubusercontent.com/tks10/Images/master/UNet/horse_original.jpeg)![segmented](https://raw.githubusercontent.com/tks10/Images/master/UNet/horse_segmented.png)
+<img src=https://raw.githubusercontent.com/tks10/Images/master/UNet/horse_original.jpeg width=50%><img src=https://raw.githubusercontent.com/tks10/Images/master/UNet/horse_segmented.png width=50%>
 
 # Usage
 To show how to run.
