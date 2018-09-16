@@ -58,7 +58,7 @@ class ImageAugmenter:
         image_in_processed = tf.image.flip_left_right(self._ph_original)
         image_out_processed = tf.image.flip_left_right(image_out_index)
         image_out_processed = tf.one_hot(image_out_processed, depth=len(ld.DataSet.CATEGORY), dtype=tf.float32)
-        image_out_processed = tf.reshape(image_out_processed, (self._width, self._height, 22))
+        image_out_processed = tf.reshape(image_out_processed, (self._width, self._height, len(ld.DataSet.CATEGORY)))
         return {"original": image_in_processed, "segmented": image_out_processed}
 
     def brightness(self):
