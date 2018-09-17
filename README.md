@@ -33,12 +33,12 @@ U-Net has a shape like "U" as below, that's why it is called U-Net.
 The following results is got by default settings.
 
 ## Results of segmentation
-### For training set
+### For the training set
 ![training1](https://raw.githubusercontent.com/tks10/Images/master/UNet/train1.png)
 
 ![training2](https://raw.githubusercontent.com/tks10/Images/master/UNet/train2.png)
 
-### For test set
+### For the test set
 ![test1](https://raw.githubusercontent.com/tks10/Images/master/UNet/test1.png)
 
 ![test2](https://raw.githubusercontent.com/tks10/Images/master/UNet/test2.png)
