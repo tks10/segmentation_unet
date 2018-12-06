@@ -10,9 +10,11 @@ class Reporter:
     IMAGE_DIR = "image"
     LEARNING_DIR = "learning"
     INFO_DIR = "info"
+    MODEL_DIR = "model"
     PARAMETER = "parameter.txt"
     IMAGE_PREFIX = "epoch_"
     IMAGE_EXTENSION = ".png"
+    MODEL_NAME = "model.ckpt"
 
     def __init__(self, result_dir=None, parser=None):
         if result_dir is None:
@@ -24,6 +26,7 @@ class Reporter:
         self._image_test_dir = os.path.join(self._image_dir, "test")
         self._learning_dir = os.path.join(self._result_dir, self.LEARNING_DIR)
         self._info_dir = os.path.join(self._result_dir, self.INFO_DIR)
+        self._model_dir = os.path.join(self._result_dir, self.MODEL_DIR)
         self._parameter = os.path.join(self._info_dir, self.PARAMETER)
         self.create_dirs()
 
@@ -107,6 +110,9 @@ class Reporter:
         image_in_pil = Image.fromarray(np.uint8(image_in_np * 255), mode="RGB")
         image_result = Reporter.concat_images(image_in_pil, image_concated, None, "RGB")
         return image_result
+
+    def store_model(self, saver, sess):
+        saver.save(sess, os.path.join(self._model_dir, self.MODEL_NAME))
 
 
 class MatPlotManager:
