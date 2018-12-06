@@ -106,6 +106,8 @@ def train(parser):
     print("Result")
     print("[Test]  Loss:", loss_test, "Accuracy:", accuracy_test)
 
+    sess.close()
+
 
 def get_parser():
     parser = argparse.ArgumentParser(

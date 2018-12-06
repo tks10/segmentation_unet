@@ -113,7 +113,7 @@ class Reporter:
         image_result = Reporter.concat_images(image_in_pil, image_concated, None, "RGB")
         return image_result
 
-    def store_model(self, saver, sess):
+    def save_model(self, saver, sess):
         saver.save(sess, os.path.join(self._model_dir, self.MODEL_NAME))
 
 
